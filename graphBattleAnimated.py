@@ -4,52 +4,35 @@
 '''
 To Do:
 Usability
-*** High Priority ***
--- in makeValid use signal module to timeout if function takes
-   more than a second to eval and just return 0*x+30
--- makeValid security -- choose specific functions and builtins to let eval use
--- specifiy functions to import from numpy
--- remove commas in make Valid if between numbers
-*** Lower Priority ***
--- Increase line width?
--- Improve collision algorithm in win function.  Use multiple
+-- Make -24, 24 the max possible points
+-- Fix make valid (see make valid)
+-- Increase line width
+-- make last fxn function like functionString graphing -- No animation, though.
+--Improve collision algorithm in win function.  Use multiple
 squares at different angles instead of just one.
 Also, make sure the size of the squares is correct.
 -- Get Spencer to make sounds.
 -- power(x/5, inf) should be in tutorial
--- piece-wise fxn ex: -23 if -14 < x < -12 else -14 if -2 < x <-0 else -5
 '''
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as plticker
+#from matplotlib import animation
 import matplotlib.animation as animation
 from matplotlib.patches import Rectangle
-from numpy import *
 import numpy as np
+from numpy import *
 import random
 import sys
 import re
-import signal
-import time
-import multiprocessing
+import os
 
 
 def collision(point, start, width, height):
-    '''checks if point and block collided'''
     if start[0] < point[0] < start[0]+width:
         if start[1] < point[1] < start[1]+height:
             return True
     return False
-
-def distance(dotPoint, start, width, height):
-    '''returns smallest distance between dot and one of the corners of block'''
-    smallestDist = 100
-    topLeft = sqrt((dotPoint[1]-start[1])**2+(dotPoint[0]-start[0])**2)
-    topRight = sqrt((dotPoint[1]-start[1])**2+(dotPoint[0]-start[0]+width)**2)
-    botLeft = sqrt((dotPoint[1]-start[1]+height)**2+(dotPoint[0]-start[0])**2)
-    botRight = sqrt((dotPoint[1]-start[1]+height)**2+(dotPoint[0]-start[0]+width)**2)
-    return min([topLeft, topRight, botLeft, botRight])
-    
 
 def blockPositions(dot1, dot2):
     '''takes in block position and returns starting position for blocks
@@ -64,12 +47,11 @@ def blockPositions(dot1, dot2):
     collided = False
     for block in flatBlockList:
         for dot in dotList:
-            # Guessing that distance of 1.5 min will decrease overlap
-            if collision(dot, block, 5, 1) or distance(dot, block, 5, 1) < 1.5:
+            if collision(dot, block, 5, 1):
                 collided = True
     for block in tallBlockList:
         for dot in dotList:
-            if collision(dot, block, 1, 5) or distance(dot, block, 1, 5) < 1.5:
+            if collision(dot, block, 1, 5):
                 collided = True
     if collided:
         flatBlockList, tallBlockList = blockPositions(dot1, dot2)
@@ -96,77 +78,57 @@ def firstGraph(dot1, dot2, flatBlockList, tallBlockList):
     plt.show()
 
 def yieldFxn(i,x,y,line):
-    '''returns line values for animated graph at interval i of animation'''
+    ''''''
     line.set_data(y[:i*240],
                   x[:i*240]) # y,x
     return line,
 
-def generateValues(functionString, multiplier = 600, threshold = 1250):
-    '''returns lists of x and y values'''
-    xList = [x/multiplier for x in range(-25*multiplier,25*multiplier+1)]
-    yList = []
-    for y in range(-25*multiplier,25*multiplier+1):
-        x = y/multiplier
-        try:
-            threshold = threshold
-            if -threshold < (eval(functionString)) < threshold:
-                yList.append(eval(functionString))
-            else:
-                yList.append(np.inf)
-                print('inf', x)
-        except ZeroDivisionError:
-            yList.append(np.inf)
-        except:
-            yList.append(np.inf)
-            ## Not sure if right thing to append -- this deals with fractional
-            ## exponents and imaginary numbers
-    return xList, yList
 
 def graph(lastFxnStr, dot1, dot2, turns, flatBlockList, tallBlockList):
     '''gets input and produces new graph.  Returns new fxn'''
+    functionString = input()
     np.seterr(divide='ignore', invalid='ignore')
+    functionString = makeValid(functionString)
     if turns % 2 == 0:
         #Player 1's turn
         firstColor = 'c'
         secondColor = 'orange'
-        functionString = input('Player 1, what is your function?\n')
     else:
         firstColor = 'orange'
         secondColor = 'c'
-        functionString = input('Player 2, what is your function?\n')
-    functionString = makeValid(functionString)
     fig = plt.figure()
     plt.plot(dot1[0], dot1[1], marker='o', color=firstColor, markersize = 11)
     plt.plot(dot2[0], dot2[1], marker='o', color=secondColor, markersize = 11) # radius=0.7
-    # ___ Plot axis ___
     plt.axis((-25,25,-25,25))
     ax = plt.axes()
     ax.xaxis.set_ticks([x for x in range(-20,21,5)])
     ax.yaxis.set_ticks([y for y in range(-20,21,5)])
     plt.grid(color = 'grey', linewidth = 1.3)
     x = np.linspace(-25,25,1000001)
-    #plt.plot(x, eval(lastFxnStr), color = secondColor)
-    plt.plot(x, 10**10*x, color = 'k', linestyle='dotted', linewidth = 1.6)
+    #plt.plot(x, eval(functionString), color = firstColor)
+    plt.plot(x, eval(lastFxnStr), color = secondColor)
+    plt.plot(x, 100**100*x, color = 'k', linestyle='dotted', linewidth = 1.6)
     plt.plot(x, 0*x, color='k', linestyle='dotted',linewidth = 1.6)
-    # ___ Plot x and y ___
-    try:
-        p = multiprocessing.Process(target=generateValues, args = functionString)
-        startTime = time.time()
-        p.start()
-        while True:
-            if not p.is_alive():
-                break
-            if time.time()-start > 5:
-                print('graphTime')
-                return '30+0*x'
-        xList, yList = generateValues(functionString)
-        line, = ax.plot([], [], lw=1, color = firstColor)
-        ani = animation.FuncAnimation(fig, yieldFxn, fargs = (yList, xList, line) ,interval = 0.001,
-                                      frames = 126, repeat = False, blit= True)
-    except Exception as ex:
-        pass
-    lastX, lastY = generateValues(lastFxnStr)
-    plt.plot(lastX, lastY, color = secondColor)
+    yList = [y/600 for y in range(-15000,15001)]
+    xList = []
+    ##Type Error below: Problem converting complex to float! x^0.5 won't work! use power(x, 0.5) instead in makeValid
+    for z in range(-15000,15001):
+        x = z/600
+        try:
+            threshold = 1250
+            if -threshold < (eval(functionString)) < threshold:
+                xList.append(eval(functionString))
+            else:
+                xList.append(np.inf)
+        except ZeroDivisionError:
+            xList.append(np.inf)
+        except:
+            xList.append(np.inf) ## Not sure if right thing to append -- this deals with fractional exponents and imaginary numbers
+    #print(xList)
+    #print(yList)
+    line, = ax.plot([], [], lw=1, color = firstColor)
+    ani = animation.FuncAnimation(fig, yieldFxn, fargs = (xList, yList, line) ,interval = 0.001,
+                                  frames = 126, repeat = False, blit= True)
     currentAxis = plt.gca()
     for block in flatBlockList:
         currentAxis.add_patch(Rectangle(block,5,1, facecolor='cornflowerblue'))
@@ -185,19 +147,17 @@ def convertX(fxnStr, newChar): ## Can this be deleted?
             fxnList[i] = newChar
     return "".join(fxnList)
 
-def evalFxn(fxnStr, x):
-    """worker function"""
-    value = eval(fxnStr)
-    return value
-
 def makeValid(fxn):
     '''takes in a function and turns it into str of evaluatable fxn code'''
+    ## To do:
+    ## multipliction of special characters pi, e, and inf
     if fxn == '':
         return '0*x'
     if 'x' not in fxn and 'X' not in fxn:
         fxn = 'x*0+' + fxn
     fxnList = list(fxn)
     # |stuff| -> abs(stuff) and:
+    carrotList = []
     barPos = []
     for j in range(len(fxnList)):
         if fxnList[j] == 'X':
@@ -207,8 +167,7 @@ def makeValid(fxn):
         elif fxnList[j] == '^':
             fxnList[j] = '**'
     if len(barPos)%2 != 0:
-        print('uneven |\'s')
-        return '30+0*x'
+        return 30+0*x
     firstBar = True
     for pos in barPos:
         if firstBar:
@@ -227,35 +186,9 @@ def makeValid(fxn):
             twoDigits = re.search(r'\d',fxnList[i],re.I) and re.search(r'\d',fxnList[i+1],re.I)
             if (twoAlphanumerics1 or twoAlphanumerics2) and not twoDigits:
                 fxnList[i] += '*'
-    joinedList = "".join(fxnList)
-    # Does security check
-    filteredCharacters = ['quit', 'exit', '__', '"', "'", 'import', r'[\s\A]os', 'system', 'rm', r'[a-zA-Z]\.[a-zA-Z]']
-    for item in filteredCharacters:
-        if re.search(item,fxn,re.I):
-            print('naughty word')
-            return '30+0*x'
-    # Makes sure function is actually valid and doesn't run too long
-    testNumbers = [-25,-pi,0.4345343434,0,3,e,25]
-    startTime = time.time()
-    for number in testNumbers:
-        x = number
-        try:
-            p = multiprocessing.Process(target=evalFxn, args = (joinedList, x))
-            p.start()
-            while True:
-                if not p.is_alive():
-                    break
-                if (time.time() - startTime) > 13:
-                    print('valid time')
-                    return '30+0*x'
-            if type(eval(joinedList)) not in [float, int, complex, inf, np.float64]:
-                print('wrong type')
-                return '30+0*x'
-        except Exception as ex:
-            print(ex)
-            return '30+0*x'
-    return joinedList
-
+    # Adds in multiplication signs for special numers pi, e, and inf
+    print("".join(fxnList))
+    return "".join(fxnList)
 
 def makeDots():
     '''returns the coordinates for 2 dots as 2 lists'''
@@ -316,8 +249,10 @@ def main():
     turns = 1
     while True:
         turns += 1
+        print('Player 1, what is your function?')
         lastFxn = graph(lastFxn, dot1, dot2, turns, flatBlockList, tallBlockList)
         win(lastFxn, dot2, dot1, flatBlockList, tallBlockList)
+        print('Player 2, what is your function?')
         turns += 1
         lastFxn = graph(lastFxn, dot2, dot1, turns, flatBlockList, tallBlockList)
         win(lastFxn, dot1, dot2, flatBlockList, tallBlockList)
